@@ -16,13 +16,13 @@
     <div style="margin-bottom: 20px; border: 1px solid #ccc; padding: 10px;">
         <h3><a href="{% url 'property_detail' property.pk %}">{{ property.title }}</a></h3>
 
-        {% if property.image %}
-            <img src="{{ property.image.url }}" alt="{{ property.title }}" style="max-width: 200px; display:block; margin-bottom: 10px;">
+        {% if property.images.first %}
+            <img src="{{ property.images.first.image.url }}" alt="{{ property.title }}" style="max-width: 200px; display:block; margin-bottom: 10px;">
         {% endif %}
 
         <p><strong>Location:</strong> {{ property.location }}</p>
-        <p><strong>Price:</strong> ${{ property.price }}</p>
-        <p><strong>Type:</strong> {{ property.property_type }}</p>
+        <p><strong>Price:</strong> GHS {{ property.price }}</p>
+        <p><strong>Type:</strong> {{ property.get_property_type_display }}</p>
         <a href="{% url 'save_favorite' property.id %}">💖 Save Property</a>
     </div>
 {% empty %}

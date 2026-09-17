@@ -10,9 +10,9 @@
     {% csrf_token %}
     {{ form.as_p }}
 
-    {% if form.instance.image %}
+    {% if form.instance.images.first %}
         <p>Current Image:</p>
-        <img src="{{ form.instance.image.url }}" alt="{{ form.instance.title }}" style="max-width: 300px;">
+        <img src="{{ form.instance.images.first.image.url }}" alt="{{ form.instance.title }}" style="max-width: 300px;">
     {% endif %}
 
     <button type="submit">Save Property</button>

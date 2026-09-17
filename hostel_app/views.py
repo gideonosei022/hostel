@@ -1,150 +1,151 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout
-from django.contrib.auth.decorators import login_required
-from .models import Property, PropertyImage, Message
+from django.contrib import messages
+from django.contrib.auth import login
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LoginView, LogoutView
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DetailView, FormView, ListView, UpdateView, View
+
 from .forms import (
-    OwnerRegistrationForm,
-    OwnerLoginForm,
-    PropertyForm,
     ContactOwnerForm,
+    OwnerLoginForm,
+    OwnerRegistrationForm,
+    PropertyForm,
     PropertySearchForm,
 )
+from .models import Message, Property, PropertyImage
 
 
-# -------------------------------
-# Owner Registration
-# -------------------------------
-def owner_register(request):
-    if request.method == "POST":
-        form = OwnerRegistrationForm(request.POST)
+class PropertyListView(ListView):
+    model = Property
+    template_name = 'hostel_app/property_list.html'
+    context_object_name = 'properties'
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = Property.objects.filter(is_available=True)
+        form = PropertySearchForm(self.request.GET)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect("owner_dashboard")
-    else:
-        form = OwnerRegistrationForm()
-    return render(request, "register.html", {"form": form})
+            location = form.cleaned_data.get('location')
+            min_price = form.cleaned_data.get('min_price')
+            max_price = form.cleaned_data.get('max_price')
+            property_type = form.cleaned_data.get('property_type')
+
+            if location:
+                queryset = queryset.filter(location__icontains=location)
+            if min_price:
+                queryset = queryset.filter(price__gte=min_price)
+            if max_price:
+                queryset = queryset.filter(price__lte=max_price)
+            if property_type:
+                queryset = queryset.filter(property_type=property_type)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = PropertySearchForm(self.request.GET)
+        return context
 
 
-# -------------------------------
-# Owner Login
-# -------------------------------
-def owner_login(request):
-    if request.method == "POST":
-        form = OwnerLoginForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            login(request, user)
-            return redirect("owner_dashboard")
-    else:
-        form = OwnerLoginForm()
-    return render(request, "login.html", {"form": form})
+class OwnerRegisterView(FormView):
+    template_name = 'hostel_app/register.html'
+    form_class = OwnerRegistrationForm
+    success_url = reverse_lazy('owner_dashboard')
+
+    def form_valid(self, form):
+        user = form.save()
+        login(self.request, user)
+        return super().form_valid(form)
 
 
-# -------------------------------
-# Owner Logout
-# -------------------------------
-def owner_logout(request):
-    logout(request)
-    return redirect("property_list")
+class OwnerLoginView(LoginView):
+    template_name = 'hostel_app/login.html'
+    form_class = OwnerLoginForm
+    success_url = reverse_lazy('owner_dashboard')
 
 
-# -------------------------------
-# Owner Dashboard & Property Management
-# -------------------------------
-@login_required
-def owner_dashboard(request):
-    properties = Property.objects.filter(owner=request.user)
-    return render(request, "dashboard.html", {"properties": properties})
+class OwnerLogoutView(LogoutView):
+    next_page = reverse_lazy('property_list')
 
 
-@login_required
-def create_property(request):
-    if request.method == "POST":
-        form = PropertyForm(request.POST, request.FILES)
-        if form.is_valid():
-            property = form.save(commit=False)
-            property.owner = request.user
-            property.save()
-            return redirect("owner_dashboard")
-    else:
-        form = PropertyForm()
-    return render(request, "property_form.html", {"form": form})
+class OwnerDashboardView(LoginRequiredMixin, ListView):
+    model = Property
+    template_name = 'hostel_app/dashboard.html'
+    context_object_name = 'properties'
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        return Property.objects.filter(owner=self.request.user)
 
 
-@login_required
-def edit_property(request, pk):
-    property = get_object_or_404(Property, pk=pk, owner=request.user)
-    if request.method == "POST":
-        form = PropertyForm(request.POST, request.FILES, instance=property)
-        if form.is_valid():
-            form.save()
-            images = request.FILES.getlist('images')
-            for image in images:
-                PropertyImage.objects.create(property=property, image=image)
-            return redirect("owner_dashboard")
-    else:
-        form = PropertyForm(instance=property)
-    return render(request, "property_form.html", {"form": form, "property": property})
+class PropertyCreateView(LoginRequiredMixin, CreateView):
+    model = Property
+    form_class = PropertyForm
+    template_name = 'hostel_app/property_form.html'
+    success_url = reverse_lazy('owner_dashboard')
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
 
 
-@login_required
-def delete_property(request, pk):
-    property = get_object_or_404(Property, pk=pk, owner=request.user)
-    property.delete()
-    return redirect("owner_dashboard")
+class PropertyUpdateView(LoginRequiredMixin, UpdateView):
+    model = Property
+    form_class = PropertyForm
+    template_name = 'hostel_app/property_form.html'
+    success_url = reverse_lazy('owner_dashboard')
+
+    def get_queryset(self):
+        return Property.objects.filter(owner=self.request.user)
 
 
-# -------------------------------
-# Public Views (Guests / Tenants)
-# -------------------------------
-def property_list(request):
-    properties = Property.objects.filter(is_available=True)
-    form = PropertySearchForm(request.GET)
-    if form.is_valid():
-        location = form.cleaned_data.get("location")
-        min_price = form.cleaned_data.get("min_price")
-        max_price = form.cleaned_data.get("max_price")
-        property_type = form.cleaned_data.get("property_type")
-
-        if location:
-            properties = properties.filter(location__icontains=location)
-        if min_price:
-            properties = properties.filter(price__gte=min_price)
-        if max_price:
-            properties = properties.filter(price__lte=max_price)
-        if property_type:
-            properties = properties.filter(property_type=property_type)
-
-    return render(request, "property_list.html", {"properties": properties, "form": form})
+class PropertyDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        property_obj = get_object_or_404(Property, pk=pk, owner=request.user)
+        property_obj.delete()
+        return redirect('owner_dashboard')
 
 
-def property_detail(request, pk):
-    property = get_object_or_404(Property, pk=pk)
-    if request.method == "POST":
+class PropertyDetailView(DetailView):
+    model = Property
+    template_name = 'hostel_app/property_detail.html'
+    context_object_name = 'property'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = ContactOwnerForm()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
         form = ContactOwnerForm(request.POST)
         if form.is_valid():
             message = form.save(commit=False)
-            message.property = property
+            message.property = self.object
             message.save()
-            return redirect("property_detail", pk=property.pk)
-    else:
-        form = ContactOwnerForm()
-    return render(request, "property_detail.html", {"property": property, "form": form})
+            messages.success(request, 'Your message was sent successfully.')
+            return redirect('property_detail', pk=self.object.pk)
+        context = self.get_context_data(object=self.object)
+        context['form'] = form
+        return self.render_to_response(context)
 
 
-# -------------------------------
-# Session-Based Favorites (Guests)
-# -------------------------------
-def save_favorite(request, property_id):
-    favorites = request.session.get("favorites", [])
-    if property_id not in favorites:
-        favorites.append(property_id)
-        request.session["favorites"] = favorites
-    return redirect("property_list")
+class SaveFavoriteView(View):
+    def get(self, request, property_id):
+        favorites = request.session.get('favorites', [])
+        if property_id not in favorites:
+            favorites.append(property_id)
+            request.session['favorites'] = favorites
+        return redirect('property_list')
 
 
-def favorite_list(request):
-    favorites = request.session.get("favorites", [])
-    properties = Property.objects.filter(id__in=favorites)
-    return render(request, "favorites.html", {"properties": properties})
+class FavoriteListView(View):
+    def get(self, request):
+        favorites = request.session.get('favorites', [])
+        properties = Property.objects.filter(id__in=favorites)
+        return redirect('property_list') if not properties else self.render(request, properties)
+
+    def render(self, request, properties):
+        from django.shortcuts import render
+        return render(request, 'hostel_app/favorites.html', {'properties': properties})

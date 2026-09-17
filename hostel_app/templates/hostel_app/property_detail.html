@@ -9,9 +9,9 @@
 <!-- PROPERTY IMAGES -->
 <!-- ===================== -->
 
-{% if property.image %}
+{% if property.images.first %}
     <div style="margin-bottom:15px;">
-        <img src="{{ property.image.url }}" 
+        <img src="{{ property.images.first.image.url }}" 
              alt="{{ property.title }}" 
              style="max-width:500px; width:100%; border-radius:8px;">
     </div>
