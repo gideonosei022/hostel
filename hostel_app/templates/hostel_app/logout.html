@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Logged Out{% endblock %}
+
+{% block content %}
+<h2>You have been logged out</h2>
+<p>Thank you for using the property management system.</p>
+
+<a href="{% url 'owner_login' %}">
+    <button>Login Again</button>
+</a>
+
+<a href="{% url 'property_list' %}">
+    <button>Go to Home</button>
+</a>
+{% endblock %}

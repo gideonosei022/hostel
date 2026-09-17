@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'hostel_app'
 ]
 
 MIDDLEWARE = [
@@ -101,6 +102,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
+
+AUTH_USER_MODEL = 'hostel_app.User'
 
 LANGUAGE_CODE = 'en-us'
 
